@@ -4,6 +4,9 @@
 #include <lcd_grph.h>
 #endif
 
+#define TRUE 1
+#define FALSE 0
+
 #define BUTTON_NONE 0
 #define BUTTON_UP 10
 #define BUTTON_DOWN 11
@@ -12,6 +15,8 @@
 #define BUTTON_CENTER 22
 
 #define DELAY_MULT 3000
+
+#define E 2.71828182845904523536028747135266249775724709369995
 
 #define bitMask(c) ((1 << (c)) - 1)
  
@@ -66,14 +71,34 @@ Rect lcd_putStringCentered(unsigned short x, unsigned short y,
 	return rect;
 }
 
-#else
+char* toString(int var)
+{
+	int chars, max, i;
+	char* buffer;
+
+	max = 10;
+	for (chars = 1; max <= var; ++chars) max *= 10;
+
+	buffer = (char*) malloc((chars + 1) * sizeof(char));
+
+	buffer[chars] = '\0';
+
+	for (i = chars - 1; i >= 0; --i) {
+		buffer[i] = (char) (48 + (var % 10));
+		var /= 10;
+	}
+
+	return buffer;
+}
+
+#endif
 
 int _oldButtons = 0;
 int getButtonPress()
 {
 	int curr, diff;
 
-	curr = FIO0PIN;
+	curr = ~FIO0PIN;
 	diff = (curr ^ _oldButtons) & curr;
 	_oldButtons = curr;
 
@@ -95,8 +120,6 @@ int waitForButtonPress()
 		if (btn != BUTTON_NONE) return btn;
 	}
 }
-
-#endif
 
 void wait(int millis)
 {
