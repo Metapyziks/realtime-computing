@@ -1,5 +1,4 @@
-#include <lpc24xx.h>
-#include "utils.h"
+#include "input.h"
 
 int main()
 {
@@ -10,7 +9,7 @@ int main()
 	FIO3DIR = 0xFFFFFFFF;
 
 	for (;;) {
-		switch (getButtonPress()) {
+		switch (input_getButtonPress()) {
 			case BUTTON_LEFT:
 				pos = (pos + 1) & 31;
 				break;

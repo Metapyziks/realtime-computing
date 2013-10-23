@@ -1,114 +1,182 @@
-#include <lpc24xx.h>
-#include "utils.h"
+#include "lcd.h"
+#include "motor.h"
+#include "input.h"
 
-#define KEYPOINTS 18
-#define SPEEDS 8
+#define STAR_COUNT 128
+#define Z_PLANE_DIST 0.25f
+
+#define BOOST_ACCEL 1.01f
+#define MANUAL_ACCEL 1.2f
+
+#define MAX_SPEED 0.0625f
+#define MIN_SPEED 0.00390625f
 
 typedef struct {
-	double hz;
-	int mr2;
-} KeyPoint;
+    float x;
+    float y;
+    float z;
+} Star;
 
-KeyPoint keyPoints[KEYPOINTS] = {
-	{ 0.000000000,      0 },
-	{ 39.68253968,	 5000 },
-	{ 50.00000000,	 6000 },
-	{ 60.24096386,	 7000 },
-	{ 63.69426752,	 7500 },
-	{ 66.66666667,	 8000 },
-	{ 72.99270073,	 9000 },
-	{ 75.18796992,	10000 },
-	{ 84.45945946,	12000 },
-	{ 90.57971014,	15000 },
-	{ 98.03921569,	18000 },
-	{ 98.42519685,	20000 },
-	{ 104.1666667,	22500 },
-	{ 106.3829787,	25000 },
-	{ 108.6956522,	27500 },
-	{ 109.6491228,	30000 },
-	{ 112.6126126,	35000 },
-	{ 115.7407407,	40000 }
-};
+Star stars[STAR_COUNT];
 
-int findMR2Val(double hz) {
-	int i;
-	KeyPoint curr, prev;
-	double t;
+int boosting = FALSE;
+int accelerating = FALSE;
 
-	prev = keyPoints[0];
-	for (i = 1; i < KEYPOINTS; ++i) {
-		curr = keyPoints[i];
+float speed = MIN_SPEED;
+float smoothSpeed = MIN_SPEED;
 
-		if (hz < curr.hz) {
-			t = (hz - prev.hz) / (curr.hz - prev.hz);
-			return (int) round(t * curr.mr2 + (1 - t) * prev.mr2);
-		}
-
-		prev = curr;
-	}
-
-	return keyPoints[KEYPOINTS - 1].mr2;
+float getSpeedRatio(float speedVal)
+{
+	return (float) sqrt((speedVal - MIN_SPEED) / (MAX_SPEED - MIN_SPEED));
 }
 
-void setMotorSpeed(double hz)
+void updateMotor()
 {
-	char* str;
-
-	PWM0MR0 = 40000;
-	PWM0MR2 = findMR2Val(hz);
-
-	str = toString(PWM0MR2);
-	
-	lcd_fillScreen(BLACK);
-	lcd_putStringCentered(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, str);
-
-	free(str);
-
-	PWM0LER = 1 << 2;
+	motor_setSpeed(getSpeedRatio() * 120.0);
 }
 
-void initMotor()
+int accelerate(float accel)
 {
-	PINSEL2 = setBits(PINSEL2, 6, 2);
-	PWM0PCR = setBit(PWM0PCR, 10);
+	speed *= accel;
 
-	setMotorSpeed(0);
+	if (speed >= MAX_SPEED) {
+        speed = MAX_SPEED;
 
-	PWM0TCR = setBit(setBit(0, 0), 3);
+        updateMotor();
+        return TRUE;
+    }
+
+	updateMotor();
+    return FALSE;
+}
+
+int decelerate(float accel)
+{
+	speed /= accel;
+
+	if (speed <= MIN_SPEED) {
+        speed = MIN_SPEED;
+
+        updateMotor();
+        return TRUE;
+    }
+
+	updateMotor();
+    return FALSE;
+}
+
+float randFloat()
+{
+    return (rand() % 65536) / 65536f;
+}
+
+void randomizeStar(Star* star)
+{
+    star->x = randFloat() - 0.5f;
+    star->y = randFloat() - 0.5f;
+}
+
+void renderStar(Star star)
+{
+    float mn, mf;
+    int xn, yn, xf, yf;
+
+    if (star.z <= 0) return;
+
+    mn = Z_PLANE_DIST / star.z;
+    mf = Z_PLANE_DIST / (star.z + max(speed, 1f / 256f));
+
+    xn = (int) (star.x * mn * DISPLAY_WIDTH) + (DISPLAY_WIDTH >> 1);
+    yn = (int) (star.y * mn * DISPLAY_HEIGHT) + (DISPLAY_HEIGHT >> 1);
+    xf = (int) (star.x * mf * DISPLAY_WIDTH) + (DISPLAY_WIDTH >> 1);
+    yf = (int) (star.y * mf * DISPLAY_HEIGHT) + (DISPLAY_HEIGHT >> 1);
+
+    lcd_line(xn, yn, xf, yf, WHITE);
+}
+
+void renderHUD(int x, int y, int width, int height)
+{
+	float ratio;
+
+	ratio = 1f - getSpeedRatio(smoothSpeed);
+
+    lcd_drawRect(x, y, x + width, y + height, WHITE);
+    lcd_fillRect(x, y + (int) (ratio * height), x + width, y + height, WHITE);
+}
+
+void init()
+{
+    int i;
+
+    srand(0x3ae14c92);
+
+	lcd_init();
+    motor_init();
+
+    for (i = 0; i < STAR_COUNT; ++i) {
+        randomizeStar(&stars[i]);
+        stars[i].z = randFloat();
+    }
+}
+
+void think()
+{
+    int i;
+
+    smoothSpeed += (speed - smoothSpeed) * .1f;
+
+    if (!boosting) {
+        switch (input_getButtonPress()) {
+            case BUTTON_UP:
+                accelerate(MANUAL_ACCEL); break;
+            case BUTTON_DOWN:
+                decelerate(MANUAL_ACCEL); break;
+            case BUTTON_CENTER:
+                boosting = TRUE;
+                accelerating = TRUE;
+                break;
+        }
+    } else if (accelerating) {
+        if (accelerate(BOOST_ACCEL)) {
+        	accelerating = FALSE;
+        }
+    } else {
+        if (decelerate(BOOST_ACCEL)) {
+        	boosting = FALSE;
+        }
+    }
+
+    for (i = 0; i < STAR_COUNT; ++i) {
+        stars[i].z -= speed;
+
+        if (stars[i].z <= 0) {
+            randomizeStar(&stars[i]);
+            stars[i].z = 1f;
+        }
+    }
+}
+
+void render()
+{
+    int i;
+
+    for (i = 0; i < STAR_COUNT; ++i) {
+        renderStar(stars[i]);
+    }
+
+    renderHUD(4, 4, 6, DISPLAY_HEIGHT - 8);
+    renderHUD(DISPLAY_WIDTH - 10, 4, 6, DISPLAY_HEIGHT - 8);
 }
 
 int main()
 {
-	int i;
-	double speeds[SPEEDS];
+    init();
 
-	int curSpeed = 0;
+    for (;;) {
+        think();
+        render();
+        wait(16);
+    }
 
-	for (i = 0; i < SPEEDS; ++i) {
-		speeds[i] = 42.0 * sqrt(i);
-	}
-
-	lcd_init();
-	initMotor();
-
-	for (;;) {
-		switch (getButtonPress()) {
-			case BUTTON_LEFT:
-				curSpeed = (curSpeed + SPEEDS - 1) % SPEEDS;
-				setMotorSpeed(speeds[curSpeed]);
-				break;
-			case BUTTON_RIGHT:
-				curSpeed = (curSpeed + 1) % SPEEDS;
-				setMotorSpeed(speeds[curSpeed]);
-				break;
-			case BUTTON_UP:
-				setMotorSpeed(speeds[curSpeed]);
-				break;
-			case BUTTON_DOWN:
-				setMotorSpeed(0);
-				break;
-		}
-	}
-
-	return 0;
+    return 0;
 }

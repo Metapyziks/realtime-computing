@@ -1,4 +1,3 @@
-#include <lpc24xx.h>
 #include "utils.h"
 
 int main()
