@@ -84,7 +84,7 @@ void renderStar(Star star)
     if (star.z <= 0) return;
 
     mn = Z_PLANE_DIST / star.z;
-    mf = Z_PLANE_DIST / (star.z + max(speed, 1f / 256f));
+    mf = Z_PLANE_DIST / (star.z + max(speed, MIN_SPEED));
 
     xn = (int) (star.x * mn * DISPLAY_WIDTH) + (DISPLAY_WIDTH >> 1);
     yn = (int) (star.y * mn * DISPLAY_HEIGHT) + (DISPLAY_HEIGHT >> 1);
