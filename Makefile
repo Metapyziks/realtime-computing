@@ -6,7 +6,7 @@ EXERCISE = ex3
 
 # If using 32Mb external memory, define EXTMEM
 # If need 32 bit LED port,comment out this line.
-# EXTMEM = 1
+EXTMEM = 1
 
 
 # Where to find include files and startup files
