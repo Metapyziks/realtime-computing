@@ -43,24 +43,4 @@ Rect lcd_putStringCentered(unsigned short x, unsigned short y,
     return rect;
 }
 
-char* toString(int var)
-{
-    int chars, max, i;
-    char* buffer;
-
-    max = 10;
-    for (chars = 1; max <= var; ++chars) max *= 10;
-
-    buffer = (char*) malloc((chars + 1) * sizeof(char));
-
-    buffer[chars] = '\0';
-
-    for (i = chars - 1; i >= 0; --i) {
-        buffer[i] = (char) (48 + (var % 10));
-        var /= 10;
-    }
-
-    return buffer;
-}
-
 #endif

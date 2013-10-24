@@ -1,8 +1,5 @@
-///////////
-// ex3.c //
-///////////
-
 /**
+ * File Name  : ex3.c
  * Author     : James King (gvnj58)
  * Email      : james.king3@durham.ac.uk
  * Contents   : Exercise 3 main source file. A 3D star field with the viewer
@@ -21,7 +18,7 @@
 #include "input.h"
 
 ///////////////////////
-// Macro Definitions //
+// Const Definitions //
 ///////////////////////
 
 // The total number of stars to display.
@@ -57,15 +54,6 @@ typedef struct {
 //////////////////////
 // Global Variables //
 //////////////////////
-
-// Array of all existing stars.
-Star stars[STAR_COUNT];
-
-// Records whether boost / warp effect is active.
-bool boosting = FALSE;
-
-// Records whether boost is currently accelerating or decelerating.
-bool accelerating = FALSE;
 
 // The current speed of the camera.
 float speed = MIN_SPEED;
@@ -141,8 +129,7 @@ void randomizeStar(Star* star)
 // provided colour.
 void renderStar(Star star, int colour)
 {
-    float mn, mf;
-    int xn, yn, xf, yf;
+    float mn, mf; int xn, yn, xf, yf;
 
     // Don't draw a star if it is behind the camera! This should never occur
     // anyway, since we push them back when they pass the camera.
@@ -170,8 +157,7 @@ void renderStar(Star star, int colour)
 // camera speed at the given position, and with the given size.
 void renderSpeedBar(int x, int y, int width, int height)
 {
-	float ratio;
-    int unfilledHeight;
+	float ratio; int unfilledHeight;
 
     // Find how much of the box to fill.
 	ratio = 1f - getSpeedRatio(smoothSpeed);
@@ -188,8 +174,16 @@ int main()
 {
     int i;
 
-    // Seed the RNG with this carefully constructed completely non-arbitrary
-    // number.
+    // Array of all existing stars.
+    Star stars[STAR_COUNT];
+
+    // Records whether boost / warp effect is active.
+    bool boosting = FALSE;
+
+    // Records whether boost is currently accelerating or decelerating.
+    bool accelerating = FALSE;
+
+    // Seed the RNG with a carefully constructed non-arbitrary number.
     srand(0x3ae14c92);
 
     // Prepare the LCD display and motor for use.
@@ -214,9 +208,11 @@ int main()
         if (!boosting) {
             switch (input_getButtonPress()) {
                 case BUTTON_UP:
-                    accelerate(MANUAL_ACCEL); break;
+                    accelerate(MANUAL_ACCEL);
+                    break;
                 case BUTTON_DOWN:
-                    decelerate(MANUAL_ACCEL); break;
+                    decelerate(MANUAL_ACCEL);
+                    break;
                 case BUTTON_CENTER:
                     boosting = TRUE;
                     accelerating = TRUE;
