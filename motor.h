@@ -21,7 +21,7 @@
 ///////////////////////
 
 // The number of recorded keypoints.
-#define KEYPOINTS 18
+#define KEYPOINT_COUNT 18
 
 //////////////////////
 // Type Definitions //
@@ -43,7 +43,7 @@ int motor_findMR2Val(double hz) {
     int i; motor_KeyPoint curr, prev; double t;
 
     // List of all recorded keypoints in order of frequency.
-    const motor_KeyPoint _keyPoints[KEYPOINTS] = {
+    const motor_KeyPoint _keyPoints[KEYPOINT_COUNT] = {
         { 0.000000000,     0 },
         { 39.68253968,  5000 },
         { 50.00000000,  6000 },
@@ -70,7 +70,7 @@ int motor_findMR2Val(double hz) {
 
     // Loop through each keypoint after the first until one with a frequency
     // greater than the desired value is found.
-    for (i = 1; i < KEYPOINTS; ++i) {
+    for (i = 1; i < KEYPOINT_COUNT; ++i) {
         curr = _keyPoints[i];
 
         // If this keypoint exceeds the desired frequency, find an interpolated
@@ -85,7 +85,7 @@ int motor_findMR2Val(double hz) {
         prev = curr;
     }
 
-    return _keyPoints[KEYPOINTS - 1].mr2;
+    return _keyPoints[KEYPOINT_COUNT - 1].mr2;
 }
 
 // Set up the various motor registers and stuff.
