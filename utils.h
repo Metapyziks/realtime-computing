@@ -24,6 +24,16 @@
 #define setBits(x, i, c) ((x) | (bitMask(c) << (i)))
 #define cpyBits(x, i, c, v) (clrBits(x, i, c) | (((v) & bitMask(c)) << (i)))
 
+#define min(a, b) ((a) <= (b) ? (a) : (b))
+#define max(a, b) ((a) >= (b) ? (a) : (b))
+
+typedef int bool;
+
+float randFloat()
+{
+    return (rand() % 65536) / 65536f;
+}
+
 void wait(int millis)
 {
 	volatile int i = 0;
