@@ -32,7 +32,7 @@ float getSpeedRatio(float speedVal)
 
 void updateMotor()
 {
-	motor_setSpeed(getSpeedRatio() * 120.0);
+	motor_setSpeed(getSpeedRatio(speed) * 120.0);
 }
 
 int accelerate(float accel)
@@ -46,7 +46,7 @@ int accelerate(float accel)
         return TRUE;
     }
 
-	updateMotor();
+    updateMotor();
     return FALSE;
 }
 
@@ -61,7 +61,7 @@ int decelerate(float accel)
         return TRUE;
     }
 
-	updateMotor();
+    updateMotor();
     return FALSE;
 }
 
