@@ -3,7 +3,7 @@
 #include "input.h"
 
 #define STAR_COUNT 128
-#define Z_PLANE_DIST 0.25f
+#define Z_PLANE_DIST 0.5f
 
 #define BOOST_ACCEL 1.01f
 #define MANUAL_ACCEL 1.2f
