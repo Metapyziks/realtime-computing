@@ -47,6 +47,14 @@ typedef struct {
     Size size;
 } Rect;
 
+///////////////////////////
+// Function Declarations //
+///////////////////////////
+
+Size lcd_getStringSize(char* str);
+Rect lcd_putStringCentered(unsigned short x, unsigned short y,
+    unsigned short w, unsigned short h, char* str);
+
 //////////////////////////
 // Function Definitions //
 //////////////////////////
