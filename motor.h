@@ -77,7 +77,7 @@ int motor_findMR2Val(double hz) {
         // MR2 between this keypoint and the previous one.
         if (curr.hz >= hz) {
             t = (hz - prev.hz) / (curr.hz - prev.hz);
-            return (int) round(t * curr.mr2 + (1 - t) * prev.mr2);
+            return (int) round(t * curr.mr2 + (1.0 - t) * prev.mr2);
         }
 
         // Record the current keypoint to be used as the previous one next
