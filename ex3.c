@@ -76,7 +76,15 @@ float getSpeedRatio(float speedVal)
 // Sets the speed of the motor to reflect the current camera speed.
 void updateMotor()
 {
-	motor_setSpeed(getSpeedRatio(speedVal) * 120.0);
+    float ratio;
+
+    ratio = getSpeedRatio(speed);
+
+    if (ratio == 0.0f) {
+        motor_setSpeed(0.0);
+    } else {
+        motor_setSpeed(ratio * 100.0 + 20.0);
+    }
 }
 
 // Accelerate the camera by the given amount, and update the motor speed.
@@ -123,6 +131,14 @@ void randomizeStar(Star* star)
     star->y = randFloat() - 0.5f;
 }
 
+// Ensures the given line is kept within the display's bounds by clipping it.
+void keepLineInBounds(int* x0, int* y0, int* x1, int* y1)
+{
+    if (*x0 < 0 || *x0 >= DISPLAY_WIDTH) {
+        // TODO
+    }
+}
+
 // Projects a given star in 3D, and draws it to the screen. The star is drawn
 // as a line, with a length proportional to the camera speed to give the
 // illusion of non-instantaneous camera exposure. Draws the star in the
@@ -133,7 +149,7 @@ void renderStar(Star star, int colour)
 
     // Don't draw a star if it is behind the camera! This should never occur
     // anyway, since we push them back when they pass the camera.
-    if (star.z <= 0) return;
+    if (star.z <= 0.5f) return;
 
     // Work out the perspective multipliers for the near and far points of the
     // line we will draw for the star. Also ensures that we don't draw nothing
@@ -157,16 +173,17 @@ void renderStar(Star star, int colour)
 // camera speed at the given position, and with the given size.
 void renderSpeedBar(int x, int y, int width, int height)
 {
-	float ratio; int unfilledHeight;
+	float ratio; int filled;
 
     // Find how much of the box to fill.
-	ratio = 1f - getSpeedRatio(smoothSpeed);
-    unfilledHeight = (int) (ratio * (height - 1));
+	ratio = 1.0f - getSpeedRatio(smoothSpeed);
+    filled = (int) (ratio * (height - 2));
 
     // First draw the whole box in white, from which the non-filled-in area
     // will be carved out by drawing a smaller black box.
-    lcd_fillRect(x, y, x + width, y + height, WHITE);
-    lcd_fillRect(x + 1, y + 1, x + width - 1, y + unfilledHeight, BLACK);
+    lcd_drawRect(x, y, x + width, y + height, WHITE);
+    lcd_fillRect(x + 2, y + 2, x + width - 2, y + filled, BLACK);
+    lcd_fillRect(x + 2, y + 2 + filled, x + width - 2, y + height - 2, WHITE);
 }
 
 // Entry point, containing initialization and the main draw / update loop.
@@ -189,6 +206,9 @@ int main()
     // Prepare the LCD display and motor for use.
     lcd_init();
     motor_init();
+
+    // Make sure the motor is going at the initial speed.
+    updateMotor();
 
     // Give each star a random starting position.
     for (i = 0; i < STAR_COUNT; ++i) {
@@ -238,7 +258,7 @@ int main()
             // If the star is behind the camera, push it to the back of the
             // scene and randomize its X and Y position.
             if (stars[i].z <= 0) {
-                stars[i].z = 1f;
+                stars[i].z = 1.0f;
                 randomizeStar(&stars[i]);
             }
 
@@ -247,7 +267,7 @@ int main()
         }
 
         // Ease smoothSpeed towards the current value of speed.
-        smoothSpeed += (speed - smoothSpeed) * .1f;
+        smoothSpeed += (speed - smoothSpeed) * 0.1f;
 
         // Draw the speed bar things on either side of the display.
         renderSpeedBar(4, 4, 6, DISPLAY_HEIGHT - 8);
