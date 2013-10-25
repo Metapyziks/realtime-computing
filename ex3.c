@@ -13,13 +13,37 @@
 // Includes //
 //////////////
 
-#include "lcd.h"
-#include "motor.h"
-#include "input.h"
+#include <lpc24xx.h>
+#include <lcd_grph.h>
 
 ///////////////////////
 // Const Definitions //
 ///////////////////////
+
+// I'm pretty sure this is the case.
+#define TRUE 1
+#define FALSE 0
+
+// Approximate number of iterations of the delay loop per millisecond.
+#define DELAY_MULT 3000
+
+// According to Wikipedia.
+#define PI 3.14159265358979323846264338327950288419716939937511
+#define E 2.71828182845904523536028747135266249775724709369995
+
+// The number of recorded motor speed keypoints.
+#define KEYPOINT_COUNT 18
+
+// The number of possible buttons that can be pressed.
+#define BUTTON_COUNT 5
+
+// Bit numbers in FIO0PIN for each button.
+#define BUTTON_NONE -1
+#define BUTTON_UP 10
+#define BUTTON_DOWN 11
+#define BUTTON_LEFT 12
+#define BUTTON_RIGHT 13
+#define BUTTON_CENTER 22
 
 // The total number of stars to display.
 #define STAR_COUNT 128
@@ -43,9 +67,58 @@
 // The minimum speed the camera is allowed to travel at.
 #define MIN_SPEED 0.00390625f
 
+///////////////////////
+// Macro Definitions //
+///////////////////////
+
+// Produces a binary number with the given number of 1s in a row.
+#define bitMask(c) ((1 << (c)) - 1)
+
+// Isolates and shifts a single bit for easy comparison.
+#define getBit(x, i) (((x) >> (i)) & 1)
+
+// Isolates and shifts a group of bits for easy comparison.
+#define getBits(x, i, c) (((x) >> (i)) & bitMask((c)))
+ 
+// Sets a single bit at the specified position to 0.
+#define clrBit(x, i) ((x) & ~(1 << (i)))
+
+// Sets a single bit at the specified position to 1.
+#define setBit(x, i) ((x) | (1 << (i)))
+
+// Sets a single bit at the specified position to whatever.
+#define cpyBit(x, i, v) (clrBit(x, i) | (((v) & 1) << i))
+ 
+// Sets a group of bits at the specified position to 0.
+#define clrBits(x, i, c) ((x) & ~(bitMask(c) << (i)))
+
+// Sets a group of bits at the specified position to 1.
+#define setBits(x, i, c) ((x) | (bitMask(c) << (i)))
+
+// Sets a group of bits at the specified position to whatever.
+#define cpyBits(x, i, c, v) (clrBits(x, i, c) | (((v) & bitMask(c)) << (i)))
+
+// Compares and gives the smallest of the two inputs.
+#define min(a, b) ((a) <= (b) ? (a) : (b))
+
+// Compares and gives the largest of the two inputs.
+#define max(a, b) ((a) >= (b) ? (a) : (b))
+
+// Gives the absolute value of the input.
+#define abs(a) ((a) < 0 ? -(a) : (a))
+
 //////////////////////
 // Type Definitions //
 //////////////////////
+
+// I'm homesick for C#.
+typedef int bool;
+
+// Contains a frequency / match register 2 value pair from a recorded keypoint.
+typedef struct {
+    double hz;
+    int mr2;
+} motor_KeyPoint;
 
 // Star structure, recording the location of the star in 3D space, and colour.
 typedef struct {
@@ -58,6 +131,22 @@ typedef struct {
 ///////////////////////////
 // Function Declarations //
 ///////////////////////////
+
+void srand(int seed);
+int rand(void);
+
+double round(double val);
+double sqrt(double val);
+
+float randFloat(void);
+void wait(int millis);
+
+int motor_findMR2Val(double hz);
+void motor_init(void);
+void motor_setSpeed(double hz);
+
+int input_getButtonPress(void);
+bool input_isKeyDown(int key);
 
 float getSpeedRatio(float speedVal);
 
@@ -75,6 +164,141 @@ void renderSpeedBar(int x, int y, int width, int height,
 //////////////////////////
 // Function Definitions //
 //////////////////////////
+
+// Returns a random single precision number between 0.0 and 1.0.
+float randFloat(void)
+{
+    return (rand() % 65536) / 65536.0f;
+}
+
+// Blocks execution for approximately the given number of milliseconds.
+void wait(int millis)
+{
+    volatile int i = 0;
+    for (i = 0; i < millis * DELAY_MULT; ++i);
+}
+
+// For a given frequency (in hertz), find the corresponding value for the MR2
+// register that would produce (approximately) that motor speed.
+int motor_findMR2Val(double hz) {
+    int i; motor_KeyPoint curr, prev; double t;
+
+    // List of all recorded keypoints in order of frequency.
+    const motor_KeyPoint _keyPoints[KEYPOINT_COUNT] = {
+        { 0.000000000,     0 },
+        { 39.68253968,  5000 },
+        { 50.00000000,  6000 },
+        { 60.24096386,  7000 },
+        { 63.69426752,  7500 },
+        { 66.66666667,  8000 },
+        { 72.99270073,  9000 },
+        { 75.18796992, 10000 },
+        { 84.45945946, 12000 },
+        { 90.57971014, 15000 },
+        { 98.03921569, 18000 },
+        { 98.42519685, 20000 },
+        { 104.1666667, 22500 },
+        { 106.3829787, 25000 },
+        { 108.6956522, 27500 },
+        { 109.6491228, 30000 },
+        { 112.6126126, 35000 },
+        { 115.7407407, 40000 }
+    };
+
+    // Record the previous keypoint (starting with the first) to be used when
+    // interpolating the final MR2 value.
+    prev = _keyPoints[0];
+
+    // Loop through each keypoint after the first until one with a frequency
+    // greater than the desired value is found.
+    for (i = 1; i < KEYPOINT_COUNT; ++i) {
+        curr = _keyPoints[i];
+
+        // If this keypoint exceeds the desired frequency, find an interpolated
+        // MR2 between this keypoint and the previous one.
+        if (curr.hz >= hz) {
+            t = (hz - prev.hz) / (curr.hz - prev.hz);
+            return (int) round(t * curr.mr2 + (1.0 - t) * prev.mr2);
+        }
+
+        // Record the current keypoint to be used as the previous one next
+        // iteration.
+        prev = curr;
+    }
+
+    return _keyPoints[KEYPOINT_COUNT - 1].mr2;
+}
+
+// Set up the various motor registers and stuff.
+void motor_init(void)
+{
+    // Apparently this enables PWM output on P1.3 or something.
+    PINSEL2 = setBits(PINSEL2, 6, 2);
+
+    // This tells the PWM unit to control something or other.
+    PWM0PCR = setBit(PWM0PCR, 10);
+
+    // Use 40k for the pulse period counter.
+    PWM0MR0 = 40000;
+
+    // Don't start the motor just yet.
+    PWM0MR2 = 0;
+
+    // Start the PWM unit.
+    PWM0TCR = setBit(setBit(0, 0), 3);
+}
+
+// Set the motor to spin at a specified speed in revolutions per second.
+void motor_setSpeed(double hz)
+{
+    PWM0MR2 = motor_findMR2Val(hz);
+
+    // Update next cycle
+    PWM0LER = 1 << 2;
+}
+
+// Checks to see if a button has been pressed since the last time this function
+// was called, and returns that button's ID if one has. If no button has been
+// pressed, returns BUTTON_NONE.
+int input_getButtonPress(void)
+{
+    int i, curr, diff;
+
+    // Record the previous state of ~FIO0PIN between invocations.
+    static int prev = 0;
+
+    // List of button IDs to loop through.
+    const int buttons[BUTTON_COUNT] = {
+        BUTTON_UP,
+        BUTTON_DOWN,
+        BUTTON_LEFT,
+        BUTTON_RIGHT,
+        BUTTON_CENTER
+    };
+
+    // Why on earth does FIO0PIN use a 0 to signify a button being pressed?
+    curr = ~FIO0PIN;
+
+    // Find the buttons that have been pressed since last invocation.
+    diff = (curr ^ prev) & curr;
+
+    // Remember the current button state for next time.
+    prev = curr;
+
+    // Find the first button that has just been pressed and return it.
+    for (i = 0; i < BUTTON_COUNT; ++i) {
+        if (getBit(diff, buttons[i])) return buttons[i];
+    }
+
+    // Otherwise, nothing new has been pressed.
+    return BUTTON_NONE;
+}
+
+// Checks to see if the specified button is currently pressed.
+bool input_isKeyDown(int button)
+{
+    return getBit(~FIO0PIN, button);
+}
 
 // Converts the given speed into a value from 0.0 to 1.0, where 0.0 is
 // MIN_SPEED and 1.0 is MAX_SPEED. Assumes the given speed is within those

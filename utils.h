@@ -28,7 +28,7 @@
 #define DELAY_MULT 3000
 
 // According to Wikipedia.
-#define PI 3.141592653589793238462643383276502884197169399375
+#define PI 3.14159265358979323846264338327950288419716939937511
 #define E 2.71828182845904523536028747135266249775724709369995
 
 ///////////////////////
@@ -68,6 +68,7 @@
 // Compares and gives the largest of the two inputs.
 #define max(a, b) ((a) >= (b) ? (a) : (b))
 
+// Gives the absolute value of the input.
 #define abs(a) ((a) < 0 ? -(a) : (a))
 
 //////////////////////

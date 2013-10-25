@@ -80,9 +80,10 @@ int input_getButtonPress(void)
     return BUTTON_NONE;
 }
 
-bool input_isKeyDown(int key)
+// Checks to see if the specified button is currently pressed.
+bool input_isKeyDown(int button)
 {
-    return getBit(~FIO0PIN, key);
+    return getBit(~FIO0PIN, button);
 }
 
 // Blocks until a button is pressed, and then returns that buttons's ID.
