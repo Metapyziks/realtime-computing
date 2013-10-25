@@ -67,6 +67,8 @@
 // Compares and gives the largest of the two inputs.
 #define max(a, b) ((a) >= (b) ? (a) : (b))
 
+#define abs(a) ((a) < 0 ? -(a) : (a))
+
 //////////////////////
 // Type Definitions //
 //////////////////////
@@ -74,12 +76,25 @@
 // I'm homesick for sane languages.
 typedef int bool;
 
+///////////////////////////
+// Function Declarations //
+///////////////////////////
+
+void srand(int seed);
+int rand(void);
+
+double round(double val);
+double sqrt(double val);
+
+float randFloat(void);
+void wait(int millis);
+
 //////////////////////////
 // Function Definitions //
 //////////////////////////
 
 // Returns a random single precision number between 0.0 and 1.0.
-float randFloat()
+float randFloat(void)
 {
     return (rand() % 65536) / 65536.0f;
 }
