@@ -52,10 +52,10 @@
 // field of view of the scene.
 #define Z_PLANE_DIST 0.75f
 
-// The acceleration / deceleration rate while boosting.
+// The acceleration / deceleration rate while warping.
 #define BOOST_ACCEL 1.01f
 
-// The number of frames to keep at full speed while boosting.
+// The number of frames to keep at full speed while warping.
 #define BOOST_FRAMES 60
 
 // The acceleration / deceleration rate while manually changing camera speed.
@@ -446,14 +446,14 @@ int main(void)
     // Array of all existing stars.
     Star stars[STAR_COUNT];
 
-    // Records whether boost / warp effect is active.
-    bool boosting = FALSE;
+    // Records whether warp / warp effect is active.
+    bool warping = FALSE;
 
-    // Records whether boost is currently accelerating or decelerating.
+    // Records whether warp is currently accelerating or decelerating.
     bool accelerating = TRUE;
 
-    // The number of frames the camera has been boosting at full speed for.
-    int boostFrames = 0;
+    // The number of frames the camera has been warping at full speed for.
+    int warpFrames = 0;
 
     // The current speed of the camera.
     float speed = MIN_SPEED;
@@ -502,11 +502,11 @@ int main(void)
             
         // If the centre key has been pressed, toggle warping.
         if (input_getButtonPress() == BUTTON_CENTER) {
-            boosting = !boosting;
+            warping = !warping;
         }
 
         // If we aren't currently warping, accept button press inputs.
-        if (!boosting) {
+        if (!warping) {
             // Accelerate when pressing up.
             if (input_isKeyDown(BUTTON_UP)) {
                 accelerate(&speed, MANUAL_ACCEL);
@@ -523,8 +523,8 @@ int main(void)
 
             // When we've been at maximum speed for the given duration, start
             // to decelerate.
-            if (++boostFrames >= BOOST_FRAMES) {
-                boostFrames = 0;
+            if (++warpFrames >= BOOST_FRAMES) {
+                warpFrames = 0;
                 accelerating = FALSE;
             }
 
@@ -534,8 +534,8 @@ int main(void)
             
             // When we've been at minimum speed for the given duration, start
             // to accelerate.
-            if (++boostFrames >= BOOST_FRAMES) {
-                boostFrames = 0;
+            if (++warpFrames >= BOOST_FRAMES) {
+                warpFrames = 0;
                 accelerating = TRUE;
             }
         }
@@ -572,9 +572,9 @@ int main(void)
 
         // Draw the speed bar things on either side of the display.
         renderSpeedBar(4, 4, 6, DISPLAY_HEIGHT - 8,
-            smoothSpeed, boosting ? YELLOW : WHITE);
+            smoothSpeed, warping ? YELLOW : WHITE);
         renderSpeedBar(DISPLAY_WIDTH - 10, 4, 6, DISPLAY_HEIGHT - 8,
-            smoothSpeed, boosting ? YELLOW : WHITE);
+            smoothSpeed, warping ? YELLOW : WHITE);
 
         // I think we have some time to spare.
         wait(16);
