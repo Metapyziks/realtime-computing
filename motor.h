@@ -33,6 +33,14 @@ typedef struct {
     int mr2;
 } motor_KeyPoint;
 
+///////////////////////////
+// Function Declarations //
+///////////////////////////
+
+int motor_findMR2Val(double hz);
+void motor_init(void);
+void motor_setSpeed(double hz);
+
 //////////////////////////
 // Function Definitions //
 //////////////////////////
@@ -89,7 +97,7 @@ int motor_findMR2Val(double hz) {
 }
 
 // Set up the various motor registers and stuff.
-void motor_init()
+void motor_init(void)
 {
     // Apparently this enables PWM output on P1.3 or something.
     PINSEL2 = setBits(PINSEL2, 6, 2);
