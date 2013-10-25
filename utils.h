@@ -81,7 +81,7 @@ typedef int bool;
 // Returns a random single precision number between 0.0 and 1.0.
 float randFloat()
 {
-    return (rand() % 65536) / 65536f;
+    return (rand() % 65536) / 65536.0f;
 }
 
 // Blocks execution for approximately the given number of milliseconds.
