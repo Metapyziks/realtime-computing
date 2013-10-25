@@ -31,6 +31,9 @@
 // The acceleration / deceleration rate while boosting.
 #define BOOST_ACCEL 1.01f
 
+// The number of frames to keep at full speed while boosting.
+#define BOOST_FRAMES 60
+
 // The acceleration / deceleration rate while manually changing camera speed.
 #define MANUAL_ACCEL 1.2f
 
@@ -203,6 +206,9 @@ int main()
     // Records whether boost is currently accelerating or decelerating.
     bool accelerating = FALSE;
 
+    // The number of frames the camera has been boosting at full speed for.
+    int boostFrames = 0;
+
     // Seed the RNG with a carefully constructed non-arbitrary number.
     srand(0x3ae14c92);
 
@@ -255,12 +261,18 @@ int main()
             if (input_getButtonPress() == BUTTON_CENTER) {
                 boost = TRUE;
                 accelerating = TRUE;
+                boostFrames = 0;
             }
 
         // Otherwise, if we are in the acceleration phase of warping, speed up
         // the camera until it is at maximum speed.
         } else if (accelerating && accelerate(BOOST_ACCEL)) {
-            accelerating = FALSE;
+
+            // When we've been at maximum speed for the given duration, start
+            // to decelerate.
+            if (++boostFrames >= BOOST_FRAMES) {
+                accelerating = FALSE;
+            }
 
         // Otherwise, if we are in the deceleration phase of warping, slow down
         // the camera until it is at minimum speed.
