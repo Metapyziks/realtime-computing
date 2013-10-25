@@ -131,14 +131,6 @@ void randomizeStar(Star* star)
     star->y = randFloat() - 0.5f;
 }
 
-// Ensures the given line is kept within the display's bounds by clipping it.
-void keepLineInBounds(int* x0, int* y0, int* x1, int* y1)
-{
-    if (*x0 < 0 || *x0 >= DISPLAY_WIDTH) {
-        // TODO
-    }
-}
-
 // Projects a given star in 3D, and draws it to the screen. The star is drawn
 // as a line, with a length proportional to the camera speed to give the
 // illusion of non-instantaneous camera exposure. Draws the star in the
@@ -149,7 +141,7 @@ void renderStar(Star star, int colour)
 
     // Don't draw a star if it is behind the camera! This should never occur
     // anyway, since we push them back when they pass the camera.
-    if (star.z <= 0.5f) return;
+    if (star.z <= 0.0f) return;
 
     // Work out the perspective multipliers for the near and far points of the
     // line we will draw for the star. Also ensures that we don't draw nothing
@@ -157,16 +149,23 @@ void renderStar(Star star, int colour)
     mn = Z_PLANE_DIST / star.z;
     mf = Z_PLANE_DIST / (star.z + max(speed, MIN_SPEED));
 
+    // Make sure the line doesn't go off screen because apparently that crashes
+    // the program occasionally.
+    mn = min(mn, 0.5f / abs(star.x));
+    mn = min(mn, 0.5f / abs(star.y));
+
     // Using the perspective multipliers, calculate the two (X, Y) coordinate
     // pairs for the star's line. Positions the line to be relative to the
     // centre of the screen, and stretches it.
-    xn = (int) (star.x * mn * DISPLAY_WIDTH) + (DISPLAY_WIDTH >> 1);
-    yn = (int) (star.y * mn * DISPLAY_HEIGHT) + (DISPLAY_HEIGHT >> 1);
-    xf = (int) (star.x * mf * DISPLAY_WIDTH) + (DISPLAY_WIDTH >> 1);
-    yf = (int) (star.y * mf * DISPLAY_HEIGHT) + (DISPLAY_HEIGHT >> 1);
+    xn = (int) ((star.x * mn + 0.5f) * DISPLAY_WIDTH);
+    yn = (int) ((star.y * mn + 0.5f) * DISPLAY_HEIGHT);
+    xf = (int) ((star.x * mf + 0.5f) * DISPLAY_WIDTH);
+    yf = (int) ((star.y * mf + 0.5f) * DISPLAY_HEIGHT);
 
-    // Draw the line!
-    lcd_line(xn, yn, xf, yf, colour);
+    // If the line isn't completely off-screen, draw it.
+    if (xf >= 0 && xf < DISPLAY_WIDTH && yf >= 0 && yf < DISPLAY_HEIGHT) {
+        lcd_line(xn, yn, xf, yf, colour);
+    }
 }
 
 // Draw a box with a certain percentage filled up that represents the current
