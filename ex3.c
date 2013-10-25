@@ -316,6 +316,6 @@ int main()
         wait(16);
     }
 
-    // This will never happen.
-    return 0;
+    // This should never happen.
+    return (int) (1.0 / 0.0);
 }
