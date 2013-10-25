@@ -60,10 +60,14 @@ typedef struct {
 ///////////////////////////
 
 float getSpeedRatio(float speedVal);
+
 void updateMotor(float speed);
+
 bool accelerate(float* speed, float accel);
 bool decelerate(float* speed, float accel);
+
 void randomizeStar(Star* star);
+
 void renderStar(Star star, float speed, int colour);
 void renderSpeedBar(int x, int y, int width, int height,
     float speed, int colour);
