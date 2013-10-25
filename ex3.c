@@ -5,8 +5,8 @@
  * Contents   : Exercise 3 main source file. A 3D star field with the viewer
  *              flying through it at controllable speeds, using the motor to
  *              provide authentic space ship engine sound effects.
- * Controls   : Up button to accelerate, down button to slow down, and centre
- *              button to warp.
+ * Controls   : Up button to accelerate, down button to slow down, left and
+                right to strafe, and center to toggle warp mode (auto ramp up).
  */
 
 //////////////
@@ -26,7 +26,7 @@
 
 // The distance of the virtual view plane from the camera, which affects the
 // field of view of the scene.
-#define Z_PLANE_DIST 0.5f
+#define Z_PLANE_DIST 0.75f
 
 // The acceleration / deceleration rate while boosting.
 #define BOOST_ACCEL 1.01f
@@ -35,7 +35,7 @@
 #define BOOST_FRAMES 60
 
 // The acceleration / deceleration rate while manually changing camera speed.
-#define MANUAL_ACCEL 1.2f
+#define MANUAL_ACCEL 1.01f
 
 // The maximum speed the camera is allowed to travel at.
 #define MAX_SPEED 0.0625f
@@ -47,12 +47,26 @@
 // Type Definitions //
 //////////////////////
 
-// Star structure, recording the location of the star in 3D space.
+// Star structure, recording the location of the star in 3D space, and colour.
 typedef struct {
     float x;
     float y;
     float z;
+    int clr;
 } Star;
+
+///////////////////////////
+// Function Declarations //
+///////////////////////////
+
+float getSpeedRatio(float speedVal);
+void updateMotor(float speed);
+bool accelerate(float* speed, float accel);
+bool decelerate(float* speed, float accel);
+void randomizeStar(Star* star);
+void renderStar(Star star, float speed, int colour);
+void renderSpeedBar(int x, int y, int width, int height,
+    float speed, int colour);
 
 //////////////////////////
 // Function Definitions //
@@ -90,11 +104,11 @@ bool accelerate(float* speed, float accel)
 	if (*speed >= MAX_SPEED) {
         *speed = MAX_SPEED;
 
-        updateMotor();
+        updateMotor(*speed);
         return TRUE;
     }
 
-	updateMotor();
+	updateMotor(*speed);
     return FALSE;
 }
 
@@ -108,11 +122,11 @@ bool decelerate(float* speed, float accel)
 	if (*speed <= MIN_SPEED) {
         *speed = MIN_SPEED;
 
-        updateMotor();
+        updateMotor(*speed);
         return TRUE;
     }
 
-	updateMotor();
+	updateMotor(*speed);
     return FALSE;
 }
 
@@ -120,8 +134,16 @@ bool decelerate(float* speed, float accel)
 // between -0.5 and 0.5.
 void randomizeStar(Star* star)
 {
+    const int colours[4] = {
+        WHITE,
+        LIGHT_GRAY,
+        CYAN,
+        YELLOW
+    };
+
     star->x = randFloat() - 0.5f;
     star->y = randFloat() - 0.5f;
+    star->clr = colours[(int) (randFloat() * randFloat() * 4)];
 }
 
 // Projects a given star in 3D, and draws it to the screen. The star is drawn
@@ -140,7 +162,7 @@ void renderStar(Star star, float speed, int colour)
     // line we will draw for the star. Also ensures that we don't draw nothing
     // if the camera is stopped.
     mn = Z_PLANE_DIST / star.z;
-    mf = Z_PLANE_DIST / (star.z + max(speed, MIN_SPEED));
+    mf = Z_PLANE_DIST / (star.z + max(speed * 2.0f, MIN_SPEED));
 
     // Make sure the line doesn't go off screen because apparently that crashes
     // the program occasionally.
@@ -163,24 +185,33 @@ void renderStar(Star star, float speed, int colour)
 
 // Draw a box with a certain percentage filled up that represents the current
 // camera speed at the given position, and with the given size.
-void renderSpeedBar(int x, int y, int width, int height, float speed)
+void renderSpeedBar(int x, int y, int width, int height,
+    float speed, int colour)
 {
 	float ratio; int filled;
 
     // Find how much of the box to fill.
 	ratio = 1.0f - getSpeedRatio(speed);
-    filled = (int) (ratio * (height - 2));
+    filled = (int) round(ratio * (height - 2));
 
-    // Draw a white outline, then a black box to wipe out any part of the bar
-    // that shouldn't be there from the previous frame, and finally the bar in
-    // white.
-    lcd_drawRect(x, y, x + width, y + height, WHITE);
-    lcd_fillRect(x + 2, y + 2, x + width - 2, y + filled, BLACK);
-    lcd_fillRect(x + 2, y + 2 + filled, x + width - 2, y + height - 2, WHITE);
+    // Draw a white outline around the bar.
+    lcd_drawRect(x, y, x + width, y + height, colour);
+
+    // If the bar isn't full, draw a black box to erase any part of the bar
+    // left from last frame that shouldn't be there.
+    if (filled > 0) {
+        lcd_fillRect(x + 2, y + 2, x + width - 2, y + filled, BLACK);
+    }
+
+    // If the bar isn't empty, draw a white box for the bar.
+    if (filled < height - 3) {
+        lcd_fillRect(x + 2, y + 2 + filled,
+            x + width - 2, y + height - 2, colour);
+    }
 }
 
 // Entry point, containing initialization and the main draw / update loop.
-int main()
+int main(void)
 {
     int i;
 
@@ -191,7 +222,7 @@ int main()
     bool boosting = FALSE;
 
     // Records whether boost is currently accelerating or decelerating.
-    bool accelerating = FALSE;
+    bool accelerating = TRUE;
 
     // The number of frames the camera has been boosting at full speed for.
     int boostFrames = 0;
@@ -213,7 +244,7 @@ int main()
     motor_init();
 
     // Make sure the motor is going at the initial speed.
-    updateMotor();
+    updateMotor(speed);
 
     // Give each star a random starting position.
     for (i = 0; i < STAR_COUNT; ++i) {
@@ -231,18 +262,23 @@ int main()
 
         strafeSpeed *= 0.95f;
 
+        // Strafe left when left button is pressed.
+        if (input_isKeyDown(BUTTON_LEFT)) {
+            strafeSpeed -= 0.001f;
+        }
+
+        // Likewise, but for strafing right.
+        if (input_isKeyDown(BUTTON_RIGHT)) {
+            strafeSpeed += 0.001f;
+        }
+            
+        // If the centre key has been pressed, toggle warping.
+        if (input_getButtonPress() == BUTTON_CENTER) {
+            boosting = !boosting;
+        }
+
         // If we aren't currently warping, accept button press inputs.
         if (!boosting) {
-            // Strafe left when left button is pressed.
-            if (input_isKeyDown(BUTTON_LEFT)) {
-                strafeSpeed -= 0.001f;
-            }
-
-            // Likewise, but for strafing right.
-            if (input_isKeyDown(BUTTON_RIGHT)) {
-                strafeSpeed += 0.001f;
-            }
-
             // Accelerate when pressing up.
             if (input_isKeyDown(BUTTON_UP)) {
                 accelerate(&speed, MANUAL_ACCEL);
@@ -252,13 +288,6 @@ int main()
             if (input_isKeyDown(BUTTON_DOWN)) {
                 decelerate(&speed, MANUAL_ACCEL);
             }
-            
-            // If the centre key has been pressed, start warping.
-            if (input_getButtonPress() == BUTTON_CENTER) {
-                boost = TRUE;
-                accelerating = TRUE;
-                boostFrames = 0;
-            }
 
         // Otherwise, if we are in the acceleration phase of warping, speed up
         // the camera until it is at maximum speed.
@@ -267,13 +296,20 @@ int main()
             // When we've been at maximum speed for the given duration, start
             // to decelerate.
             if (++boostFrames >= BOOST_FRAMES) {
+                boostFrames = 0;
                 accelerating = FALSE;
             }
 
         // Otherwise, if we are in the deceleration phase of warping, slow down
         // the camera until it is at minimum speed.
         } else if (!accelerating && decelerate(&speed, BOOST_ACCEL)) {
-            boosting = FALSE;
+            
+            // When we've been at minimum speed for the given duration, start
+            // to accelerate.
+            if (++boostFrames >= BOOST_FRAMES) {
+                boostFrames = 0;
+                accelerating = TRUE;
+            }
         }
 
         // Now loop through each star again, to update their positions and draw
@@ -283,34 +319,34 @@ int main()
             stars[i].x -= strafeSpeed;
 
             // If the star is too far to the left, move it right.
-            while (stars[i].x < -0.5f) {
-                stars[i].x += 1f;
+            if (stars[i].x < -0.5f) {
+                stars[i].x += 1.0f;
             } 
 
             // If the star is too far to the right, move it left.
-            while (stars[i].x >= 0.5f) {
-                stars[i].x -= 1f;
+            if (stars[i].x >= 0.5f) {
+                stars[i].x -= 1.0f;
             }
 
             // If the star is behind the camera, push it to the back of the
             // scene and randomize its X and Y position.
-            if (stars[i].z <= 0) {
+            if (stars[i].z <= 0.0f) {
                 stars[i].z = 1.0f;
                 randomizeStar(&stars[i]);
             }
 
             // Draw the star in white.
-            renderStar(stars[i], speed, WHITE);
+            renderStar(stars[i], speed, stars[i].clr);
         }
 
         // Ease smoothSpeed towards the current value of speed.
         smoothSpeed += (speed - smoothSpeed) * 0.1f;
 
         // Draw the speed bar things on either side of the display.
-        renderSpeedBar(4, 4,
-            6, DISPLAY_HEIGHT - 8, smoothSpeed);
-        renderSpeedBar(DISPLAY_WIDTH - 10, 4,
-            6, DISPLAY_HEIGHT - 8, smoothSpeed);
+        renderSpeedBar(4, 4, 6, DISPLAY_HEIGHT - 8,
+            smoothSpeed, boosting ? YELLOW : WHITE);
+        renderSpeedBar(DISPLAY_WIDTH - 10, 4, 6, DISPLAY_HEIGHT - 8,
+            smoothSpeed, boosting ? YELLOW : WHITE);
 
         // I think we have some time to spare.
         wait(16);
