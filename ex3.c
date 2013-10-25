@@ -58,6 +58,9 @@ typedef struct {
 // The current speed of the camera.
 float speed = MIN_SPEED;
 
+// Lateral camera speed.
+float strafeSpeed = 0.0f;
+
 // An interpolated version of the camera speed for the HUD bars.
 float smoothSpeed = MIN_SPEED;
 
@@ -178,8 +181,9 @@ void renderSpeedBar(int x, int y, int width, int height)
 	ratio = 1.0f - getSpeedRatio(smoothSpeed);
     filled = (int) (ratio * (height - 2));
 
-    // First draw the whole box in white, from which the non-filled-in area
-    // will be carved out by drawing a smaller black box.
+    // Draw a white outline, then a black box to wipe out any part of the bar
+    // that shouldn't be there from the previous frame, and finally the bar in
+    // white.
     lcd_drawRect(x, y, x + width, y + height, WHITE);
     lcd_fillRect(x + 2, y + 2, x + width - 2, y + filled, BLACK);
     lcd_fillRect(x + 2, y + 2 + filled, x + width - 2, y + height - 2, WHITE);
@@ -223,19 +227,34 @@ int main()
             renderStar(stars[i], BLACK);
         }
 
+        strafeSpeed *= 0.95f;
+
         // If we aren't currently warping, accept button press inputs.
         if (!boosting) {
-            switch (input_getButtonPress()) {
-                case BUTTON_UP:
-                    accelerate(MANUAL_ACCEL);
-                    break;
-                case BUTTON_DOWN:
-                    decelerate(MANUAL_ACCEL);
-                    break;
-                case BUTTON_CENTER:
-                    boosting = TRUE;
-                    accelerating = TRUE;
-                    break;
+            // Strafe left when left button is pressed.
+            if (input_isKeyDown(BUTTON_LEFT)) {
+                strafeSpeed -= 0.001f;
+            }
+
+            // Likewise, but for strafing right.
+            if (input_isKeyDown(BUTTON_RIGHT)) {
+                strafeSpeed += 0.001f;
+            }
+
+            // Accelerate when pressing up.
+            if (input_isKeyDown(BUTTON_UP)) {
+                accelerate(MANUAL_ACCEL);
+            }
+
+            // Decelerate when pressing down.
+            if (input_isKeyDown(BUTTON_DOWN)) {
+                decelerate(MANUAL_ACCEL);
+            }
+            
+            // If the centre key has been pressed, start warping.
+            if (input_getButtonPress() == BUTTON_CENTER) {
+                boost = TRUE;
+                accelerating = TRUE;
             }
 
         // Otherwise, if we are in the acceleration phase of warping, speed up
@@ -253,6 +272,17 @@ int main()
         // them to the display.
         for (i = 0; i < STAR_COUNT; ++i) {
             stars[i].z -= speed;
+            stars[i].x -= strafeSpeed;
+
+            // If the star is too far to the left, move it right.
+            while (stars[i].x < -0.5f) {
+                stars[i].x += 1f;
+            } 
+
+            // If the star is too far to the right, move it left.
+            while (stars[i].x >= 0.5f) {
+                stars[i].x -= 1f;
+            }
 
             // If the star is behind the camera, push it to the back of the
             // scene and randomize its X and Y position.

@@ -72,6 +72,11 @@ int input_getButtonPress()
     return BUTTON_NONE;
 }
 
+bool input_isKeyDown(int key)
+{
+    return getBit(~FIO0PIN, key);
+}
+
 // Blocks until a button is pressed, and then returns that buttons's ID.
 int input_waitForButtonPress()
 {
