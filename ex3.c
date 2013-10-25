@@ -54,19 +54,6 @@ typedef struct {
     float z;
 } Star;
 
-//////////////////////
-// Global Variables //
-//////////////////////
-
-// The current speed of the camera.
-float speed = MIN_SPEED;
-
-// Lateral camera speed.
-float strafeSpeed = 0.0f;
-
-// An interpolated version of the camera speed for the HUD bars.
-float smoothSpeed = MIN_SPEED;
-
 //////////////////////////
 // Function Definitions //
 //////////////////////////
@@ -80,7 +67,7 @@ float getSpeedRatio(float speedVal)
 }
 
 // Sets the speed of the motor to reflect the current camera speed.
-void updateMotor()
+void updateMotor(float speed)
 {
     float ratio;
 
@@ -95,13 +82,13 @@ void updateMotor()
 
 // Accelerate the camera by the given amount, and update the motor speed.
 // Returns TRUE if the camera is now at maximum speed, and FALSE otherwise.
-bool accelerate(float accel)
+bool accelerate(float* speed, float accel)
 {
-	speed *= accel;
+	*speed *= accel;
 
     // Not so fast!
-	if (speed >= MAX_SPEED) {
-        speed = MAX_SPEED;
+	if (*speed >= MAX_SPEED) {
+        *speed = MAX_SPEED;
 
         updateMotor();
         return TRUE;
@@ -113,13 +100,13 @@ bool accelerate(float accel)
 
 // Decelerate the camera by the given amount, and update the motor speed.
 // Returns TRUE if the camera is now at minimum speed, and FALSE otherwise.
-bool decelerate(float accel)
+bool decelerate(float* speed, float accel)
 {
-	speed /= accel;
+	*speed /= accel;
 
     // You're going too slow...
-	if (speed <= MIN_SPEED) {
-        speed = MIN_SPEED;
+	if (*speed <= MIN_SPEED) {
+        *speed = MIN_SPEED;
 
         updateMotor();
         return TRUE;
@@ -141,7 +128,7 @@ void randomizeStar(Star* star)
 // as a line, with a length proportional to the camera speed to give the
 // illusion of non-instantaneous camera exposure. Draws the star in the
 // provided colour.
-void renderStar(Star star, int colour)
+void renderStar(Star star, float speed, int colour)
 {
     float mn, mf; int xn, yn, xf, yf;
 
@@ -176,12 +163,12 @@ void renderStar(Star star, int colour)
 
 // Draw a box with a certain percentage filled up that represents the current
 // camera speed at the given position, and with the given size.
-void renderSpeedBar(int x, int y, int width, int height)
+void renderSpeedBar(int x, int y, int width, int height, float speed)
 {
 	float ratio; int filled;
 
     // Find how much of the box to fill.
-	ratio = 1.0f - getSpeedRatio(smoothSpeed);
+	ratio = 1.0f - getSpeedRatio(speed);
     filled = (int) (ratio * (height - 2));
 
     // Draw a white outline, then a black box to wipe out any part of the bar
@@ -209,6 +196,15 @@ int main()
     // The number of frames the camera has been boosting at full speed for.
     int boostFrames = 0;
 
+    // The current speed of the camera.
+    float speed = MIN_SPEED;
+
+    // Lateral camera speed.
+    float strafeSpeed = 0.0f;
+
+    // An interpolated version of the camera speed for the HUD bars.
+    float smoothSpeed = MIN_SPEED;
+
     // Seed the RNG with a carefully constructed non-arbitrary number.
     srand(0x3ae14c92);
 
@@ -230,7 +226,7 @@ int main()
         // Erase all the stars from the sky. I'm assuming it's faster to do
         // this than do lcd_fillScreen(BLACK).
         for (i = 0; i < STAR_COUNT; ++i) {
-            renderStar(stars[i], BLACK);
+            renderStar(stars[i], speed, BLACK);
         }
 
         strafeSpeed *= 0.95f;
@@ -249,12 +245,12 @@ int main()
 
             // Accelerate when pressing up.
             if (input_isKeyDown(BUTTON_UP)) {
-                accelerate(MANUAL_ACCEL);
+                accelerate(&speed, MANUAL_ACCEL);
             }
 
             // Decelerate when pressing down.
             if (input_isKeyDown(BUTTON_DOWN)) {
-                decelerate(MANUAL_ACCEL);
+                decelerate(&speed, MANUAL_ACCEL);
             }
             
             // If the centre key has been pressed, start warping.
@@ -266,7 +262,7 @@ int main()
 
         // Otherwise, if we are in the acceleration phase of warping, speed up
         // the camera until it is at maximum speed.
-        } else if (accelerating && accelerate(BOOST_ACCEL)) {
+        } else if (accelerating && accelerate(&speed, BOOST_ACCEL)) {
 
             // When we've been at maximum speed for the given duration, start
             // to decelerate.
@@ -276,7 +272,7 @@ int main()
 
         // Otherwise, if we are in the deceleration phase of warping, slow down
         // the camera until it is at minimum speed.
-        } else if (!accelerating && decelerate(BOOST_ACCEL)) {
+        } else if (!accelerating && decelerate(&speed, BOOST_ACCEL)) {
             boosting = FALSE;
         }
 
@@ -304,15 +300,17 @@ int main()
             }
 
             // Draw the star in white.
-            renderStar(stars[i], WHITE);
+            renderStar(stars[i], speed, WHITE);
         }
 
         // Ease smoothSpeed towards the current value of speed.
         smoothSpeed += (speed - smoothSpeed) * 0.1f;
 
         // Draw the speed bar things on either side of the display.
-        renderSpeedBar(4, 4, 6, DISPLAY_HEIGHT - 8);
-        renderSpeedBar(DISPLAY_WIDTH - 10, 4, 6, DISPLAY_HEIGHT - 8);
+        renderSpeedBar(4, 4,
+            6, DISPLAY_HEIGHT - 8, smoothSpeed);
+        renderSpeedBar(DISPLAY_WIDTH - 10, 4,
+            6, DISPLAY_HEIGHT - 8, smoothSpeed);
 
         // I think we have some time to spare.
         wait(16);
