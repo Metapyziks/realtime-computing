@@ -31,6 +31,14 @@
 #define BUTTON_RIGHT 13
 #define BUTTON_CENTER 22
 
+///////////////////////////
+// Function Declarations //
+///////////////////////////
+
+int input_getButtonPress(void);
+bool input_isKeyDown(int key);
+int input_waitForButtonPress(void);
+
 //////////////////////////
 // Function Definitions //
 //////////////////////////
@@ -38,7 +46,7 @@
 // Checks to see if a button has been pressed since the last time this function
 // was called, and returns that button's ID if one has. If no button has been
 // pressed, returns BUTTON_NONE.
-int input_getButtonPress()
+int input_getButtonPress(void)
 {
     int i, curr, diff;
 
@@ -78,7 +86,7 @@ bool input_isKeyDown(int key)
 }
 
 // Blocks until a button is pressed, and then returns that buttons's ID.
-int input_waitForButtonPress()
+int input_waitForButtonPress(void)
 {
     int btn;
     
