@@ -59,7 +59,7 @@ int buildWaveForm(short** dest, int type, int hz) {
 
 int main(void)
 {
-	bool playing; short* waveForm; int note, type, length, i;
+	bool playing; short* waveForm; int note, type, length; volatile int i;
 
 	const int notes[12] = {
 		220, // NOTE_A
@@ -90,7 +90,7 @@ int main(void)
 				playing = !playing;
 				break;
 			case BUTTON_UP:
-				note = NOTE_B;
+				++note;
 				if (note > NOTE_G_SHARP) note = NOTE_A;
 				length = buildWaveForm(&waveForm, type, notes[note]);
 				break;
