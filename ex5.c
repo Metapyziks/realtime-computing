@@ -148,6 +148,17 @@ void play(int volume);
 void drawBuffer(int x, int y, int w, int h);
 void drawVolume(int volume, int x, int y, int w, int h);
 
+//////////////////////
+// Global Variables //
+//////////////////////
+
+// The sample buffer must be global otherwise it exceeds the allowed stack
+// size for the function it is declared in.
+short sampleBuffer[SAMPLE_LENGTH];
+
+// The number of samples recorded.
+unsigned long recordedSamples;
+
 //////////////////////////
 // Function Definitions //
 //////////////////////////
@@ -377,6 +388,7 @@ void adc_init(void)
     AD0CR = setBit(cpyBits(2, 8, 8, 12000000 / (SAMPLE_RATE * 16)), 21);
 }
 
+// Read a single sample from the ADC.
 short adc_read(void)
 {
     AD0CR = cpyBits(AD0CR, 24, 3, 1);
@@ -384,31 +396,34 @@ short adc_read(void)
     return (short) getBits(AD0DR1, 6, 10);
 }
 
+// Initialize the Digital to Analogue Converter.
 void dac_init(void)
 {
     PINSEL1 = cpyBits(PINSEL1, 20, 2, 1 << 1);
 }
 
-unsigned char sampleBuffer[SAMPLE_LENGTH];
-unsigned long recordedSamples;
-
+// Forget any previous recording.
 void clear(void)
 {
     recordedSamples = 0;
 }
 
+// Record samples until SAMPLE_LENGTH samples are recorded or
+// the center button is pressed.
 void record(void)
 {
     unsigned long b;
     int x, oldX; short val;
 
+    // Clear the progress bar.
     lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, WHITE);
+
     oldX = 0;
     for (b = 0; b < SAMPLE_LENGTH; ++b) {
         val = adc_read();
-        sampleBuffer[b] = (char) (val >> 2);
+        sampleBuffer[b] = val;
 
-        x = (b * (DISPLAY_WIDTH - 21)) / SAMPLE_LENGTH;
+        x = (b * (DISPLAY_WIDTH - 12)) / SAMPLE_LENGTH;
         if (x > oldX) {
             oldX = x;
             lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
@@ -432,10 +447,10 @@ void play(int volume)
     oldX = 0;
 
     for (b = 0; b < recordedSamples; ++b) {
-        val = (((int) sampleBuffer[b] << 1) * volume) / 256;
+        val = (sampleBuffer[b] * volume) / 256;
         DACR = cpyBits(0, 6, 10, val);
 
-        x = (b * (DISPLAY_WIDTH - 21)) / recordedSamples;
+        x = (b * (DISPLAY_WIDTH - 12)) / recordedSamples;
         if (x > oldX) {
             oldX = x;
             lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
@@ -530,7 +545,7 @@ int main(void)
         switch (input_waitForButtonPress()) {
             case BUTTON_CENTER:
                 record();
-                drawBuffer(4, 4, DISPLAY_WIDTH - 10, 120);
+                drawBuffer(6, 4, DISPLAY_WIDTH - 14, 120);
                 break;
             case BUTTON_LEFT:
                 clear();
