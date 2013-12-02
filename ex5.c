@@ -39,16 +39,16 @@
 #define BIG_CHAR_HEIGHT 16
 
 // The number of seconds to record a sample for.
-#define SAMPLE_PERIOD 8
+#define SAMPLE_PERIOD 300
 
 // The number of samples recorded per second.
-#define SAMPLE_RATE 8000
+#define SAMPLE_RATE 44100
 
 // The total number of samples to be recorded.
 #define SAMPLE_LENGTH (SAMPLE_RATE * SAMPLE_PERIOD)
 
 // Range for the playback timing loop.
-#define PLAYBACK_LOOP_ITERS (2600000 / SAMPLE_RATE)
+#define PLAYBACK_LOOP_ITERS (2900000 / SAMPLE_RATE)
 
 ///////////////////////
 // Macro Definitions //
@@ -141,11 +141,11 @@ short adc_read(void);
 
 void dac_init(void);
 
-void clear(char* buffer);
-void record(char* buffer);
-void play(char* buffer, int volume);
+void clear(void);
+void record(void);
+void play(int volume);
 
-void drawBuffer(char* buffer, int x, int y, int w, int h);
+void drawBuffer(int x, int y, int w, int h);
 void drawVolume(int volume, int x, int y, int w, int h);
 
 //////////////////////////
@@ -389,48 +389,66 @@ void dac_init(void)
     PINSEL1 = cpyBits(PINSEL1, 20, 2, 1 << 1);
 }
 
-void clear(unsigned char* buffer)
-{
-    int i;
+unsigned char sampleBuffer[SAMPLE_LENGTH];
+unsigned long recordedSamples;
 
-    for (i = 0; i < SAMPLE_LENGTH; ++i) {
-        buffer[i] = 0;
-    }
+void clear(void)
+{
+    recordedSamples = 0;
 }
 
-void record(unsigned char* buffer)
+void record(void)
 {
-    int b, x, oldX; short val;
+    unsigned long b;
+    int x, oldX; short val;
 
-    lcd_fillRect(4, 126, DISPLAY_WIDTH - 6, 128, WHITE);
+    lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, WHITE);
     oldX = 0;
     for (b = 0; b < SAMPLE_LENGTH; ++b) {
         val = adc_read();
-        buffer[b] = (char) (val >> 2);
+        sampleBuffer[b] = (char) (val >> 2);
 
-        x = (b * (DISPLAY_WIDTH - 19)) / SAMPLE_LENGTH;
+        x = (b * (DISPLAY_WIDTH - 21)) / SAMPLE_LENGTH;
         if (x > oldX) {
             oldX = x;
             lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
         }
 
+        if (input_getButtonPress() == BUTTON_CENTER) {
+            recordedSamples = b;
+            break;
+        }
+
     }
-    lcd_fillRect(4, 126, DISPLAY_WIDTH - 6, 128, RED);
-    lcd_fillRect(4, 4, DISPLAY_WIDTH - 6, 126, BLACK);
+    lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, RED);
+    lcd_fillRect(4, 4, DISPLAY_WIDTH - 8, 126, BLACK);
 }
 
-void play(unsigned char* buffer, int volume)
+void play(int volume)
 {
-    int b; int val; volatile int i;
+    int b, val, x, oldX; volatile int i;
 
-    for (b = 0; b < SAMPLE_LENGTH; ++b) {
-        val = (((int) buffer[b] << 1) * volume) / 256;
+    lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, WHITE);
+    oldX = 0;
+
+    for (b = 0; b < recordedSamples; ++b) {
+        val = (((int) sampleBuffer[b] << 1) * volume) / 256;
         DACR = cpyBits(0, 6, 10, val);
+
+        x = (b * (DISPLAY_WIDTH - 21)) / recordedSamples;
+        if (x > oldX) {
+            oldX = x;
+            lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
+        }
+        if (input_getButtonPress() != BUTTON_NONE) break;
+
         for (i = 0; i < PLAYBACK_LOOP_ITERS; ++ i);
     }
+
+    lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, RED);
 }
 
-void drawBuffer(unsigned char* buffer, int x, int y, int w, int h)
+void drawBuffer(int x, int y, int w, int h)
 {
     short val, prev, rangeMin, rangeMax, valMin, valMax;
     int i, b, start, end;
@@ -440,29 +458,29 @@ void drawBuffer(unsigned char* buffer, int x, int y, int w, int h)
     rangeMax = 0x000;
     avg = 0;
 
-    for (b = 0; b < SAMPLE_LENGTH; ++b) {
-        val = buffer[b];
+    for (b = 0; b < recordedSamples; ++b) {
+        val = sampleBuffer[b];
         avg += val;
         
         if (val > rangeMax) rangeMax = val;
         if (val < rangeMin) rangeMin = val;
     }
 
-    avg /= SAMPLE_LENGTH;
+    avg /= recordedSamples;
 
     rangeMax = max(rangeMax - avg, avg - rangeMin);
 
     prev = 0;
     for (i = 0; i < w; ++i) {
-        start = (i * SAMPLE_LENGTH) / w;
-        end = ((i + 1) * SAMPLE_LENGTH) / w;
+        start = (i * recordedSamples) / w;
+        end = ((i + 1) * recordedSamples) / w;
 
         if (start == end) continue;
 
         valMin = 0x3ff;
         valMax = 0x000;
         for (b = start; b < end; ++b) {
-            val = buffer[b];
+            val = sampleBuffer[b];
             if (val < valMin) valMin = val;
             if (val > valMax) valMax = val;
         }
@@ -484,7 +502,7 @@ void drawVolume(int volume, int x, int y, int w, int h)
 
 int main(void)
 {
-    unsigned char buffer[SAMPLE_LENGTH]; int volume;
+    int volume;
 
     const int volumes[10] = {
         0, 16, 22, 31, 44, 61, 86, 120, 169, 256
@@ -503,30 +521,32 @@ int main(void)
     lcd_putBigStringCentered(0, 256, DISPLAY_WIDTH, 32,
         "  Down : -Volume ");
 
-    clear(buffer);
+    clear();
 
     volume = 8;
-    drawVolume(volume, DISPLAY_WIDTH - 4, 4, 2, 120);
+    drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
 
     for(;;) {
         switch (input_waitForButtonPress()) {
             case BUTTON_CENTER:
-                record(buffer);
-                drawBuffer(buffer, 4, 4, DISPLAY_WIDTH - 10, 120);
+                record();
+                drawBuffer(4, 4, DISPLAY_WIDTH - 10, 120);
                 break;
             case BUTTON_LEFT:
-                clear(buffer);
+                clear();
                 break;
             case BUTTON_RIGHT:
-                play(buffer, volumes[volume]);
+                if (recordedSamples > 0) {
+                    play(volumes[volume]);
+                }
                 break;
             case BUTTON_UP:
                 volume = min(9, volume + 1);
-                drawVolume(volume, DISPLAY_WIDTH - 4, 4, 2, 120);
+                drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
                 break;
             case BUTTON_DOWN:
                 volume = max(0, volume - 1);
-                drawVolume(volume, DISPLAY_WIDTH - 4, 4, 2, 120);
+                drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
                 break;
         }
     }
