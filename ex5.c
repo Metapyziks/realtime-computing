@@ -11,7 +11,8 @@
 // Const Definitions //
 ///////////////////////
 
-// I'm pretty sure this is the case.
+// Used to make it clear when a literal should be interpreted as a bool
+// by anyone reading the code.
 #define TRUE 1
 #define FALSE 0
 
@@ -136,7 +137,6 @@ Rect lcd_putBigStringCentered(unsigned short x, unsigned short y,
     unsigned short w, unsigned short h, char* str);
 
 void adc_init(void);
-void adc_kill(void);
 short adc_read(void);
 
 void dac_init(void);
@@ -178,7 +178,7 @@ inline int input_getButtonPress(void)
         BUTTON_CENTER
     };
 
-    // Why on earth does FIO0PIN use a 0 to signify a button being pressed?
+    // Invert FIO0PIN so a 1 to signifies a button being pressed.
     curr = ~FIO0PIN;
 
     // Find the buttons that have been pressed since last invocation.
@@ -367,18 +367,14 @@ Rect lcd_putBigStringCentered(unsigned short x, unsigned short y,
     return rect;
 }
 
-
+// Prepares the Analogue to Digital Converter for usage with the sample
+// rate as defined by the SAMPLE_RATE constant.
 void adc_init(void)
 {
     PINSEL1 = cpyBits(PINSEL1, 16, 2, 1);
     PCONP = setBit(PCONP, 12);
 
     AD0CR = setBit(cpyBits(2, 8, 8, 12000000 / (SAMPLE_RATE * 16)), 21);
-}
-
-void adc_kill(void)
-{
-    AD0CR = clrBit(AD0CR, 21);
 }
 
 short adc_read(void)
@@ -393,7 +389,7 @@ void dac_init(void)
     PINSEL1 = cpyBits(PINSEL1, 20, 2, 1 << 1);
 }
 
-void clear(char* buffer)
+void clear(unsigned char* buffer)
 {
     int i;
 
@@ -402,7 +398,7 @@ void clear(char* buffer)
     }
 }
 
-void record(char* buffer)
+void record(unsigned char* buffer)
 {
     int b, x, oldX; short val;
 
@@ -423,7 +419,7 @@ void record(char* buffer)
     lcd_fillRect(4, 4, DISPLAY_WIDTH - 6, 126, BLACK);
 }
 
-void play(char* buffer, int volume)
+void play(unsigned char* buffer, int volume)
 {
     int b; int val; volatile int i;
 
@@ -434,7 +430,7 @@ void play(char* buffer, int volume)
     }
 }
 
-void drawBuffer(char* buffer, int x, int y, int w, int h)
+void drawBuffer(unsigned char* buffer, int x, int y, int w, int h)
 {
     short val, prev, rangeMin, rangeMax, valMin, valMax;
     int i, b, start, end;
@@ -488,7 +484,7 @@ void drawVolume(int volume, int x, int y, int w, int h)
 
 int main(void)
 {
-    char buffer[SAMPLE_LENGTH]; int volume;
+    unsigned char buffer[SAMPLE_LENGTH]; int volume;
 
     const int volumes[10] = {
         0, 16, 22, 31, 44, 61, 86, 120, 169, 256
