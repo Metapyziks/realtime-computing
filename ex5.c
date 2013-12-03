@@ -1,3 +1,17 @@
+/**
+ * File Name  : ex5.c
+ * Author     : James King (gvnj58)
+ * Email      : james.king3@durham.ac.uk
+ * Contents   : Exercise 5 main source file. A sound recording application that
+                can record up to five minutes of audio CD quality (44100 Hz)
+                sound. Also provides a amplitude graph to show peaks in the
+                recorded sample, and a playback bar to show the playback
+                progress which corresponds to the graph above it. Features
+                anti-aliased 2x scaled text rendering.
+ * Controls   : Centre button to start / stop recording. Right button to play
+                or stop, and up / down buttons to select volume.
+ */
+
 //////////////
 // Includes //
 //////////////
@@ -117,8 +131,6 @@ typedef struct {
 // Function Declarations //
 ///////////////////////////
 
-void wait(int millis);
-
 int input_getButtonPress(void);
 int input_waitForButtonPress(void);
 
@@ -162,13 +174,6 @@ unsigned long recordedSamples;
 //////////////////////////
 // Function Definitions //
 //////////////////////////
-
-// Blocks execution for approximately the given number of milliseconds.
-void wait(int millis)
-{
-    volatile int i = 0;
-    for (i = 0; i < millis * DELAY_MULT; ++i);
-}
 
 // Checks to see if a button has been pressed since the last time this function
 // was called, and returns that button's ID if one has. If no button has been
@@ -273,10 +278,11 @@ bool lcd_putBigChar(unsigned short x, unsigned short y, char chr)
     lcd_color_t color;
 
     // Don't draw off-screen.
-    if((x >= (DISPLAY_WIDTH - BIG_CHAR_WIDTH)) || (y >= (DISPLAY_HEIGHT - BIG_CHAR_HEIGHT))) return FALSE;
+    if ((x >= (DISPLAY_WIDTH - BIG_CHAR_WIDTH)) ||
+        (y >= (DISPLAY_HEIGHT - BIG_CHAR_HEIGHT))) return FALSE;
 
     // Treat strange characters as just spaces.
-    if((ch < 0x20) || (ch > 0x7f)) ch = 0x20;
+    if ((ch < 0x20) || (ch > 0x7f)) ch = 0x20;
 
     // The character bitmap array is offset by 0x20 from the actual char value.
     ch -= 0x20;
@@ -315,7 +321,7 @@ Size lcd_getStringSize(char* str)
 {
     Size size;
 
-    // I should probably take newlines into account some day...
+    // No newline support yet.
     size.width = strlen(str) * CHAR_WIDTH;
     size.height = CHAR_HEIGHT;
 
@@ -385,7 +391,7 @@ void adc_init(void)
     PINSEL1 = cpyBits(PINSEL1, 16, 2, 1);
     PCONP = setBit(PCONP, 12);
 
-    AD0CR = setBit(cpyBits(2, 8, 8, 12000000 / (SAMPLE_RATE * 16)), 21);
+    AD0CR = setBit(cpyBits(2, 8, 8, 12000000 / (SAMPLE_RATE << 4)), 21);
 }
 
 // Read a single sample from the ADC.
@@ -406,73 +412,101 @@ void dac_init(void)
 void clear(void)
 {
     recordedSamples = 0;
+
+    // Clear the volume graph for redrawing.
+    lcd_fillRect(4, 4, DISPLAY_WIDTH - 8, 126, BLACK);
 }
 
-// Record samples until SAMPLE_LENGTH samples are recorded or
-// the center button is pressed.
+// Record samples until either SAMPLE_LENGTH samples are recorded or
+// the centre button is pressed.
 void record(void)
 {
     unsigned long b;
     int x, oldX; short val;
+
+    clear();
 
     // Clear the progress bar.
     lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, WHITE);
 
     oldX = 0;
     for (b = 0; b < SAMPLE_LENGTH; ++b) {
+        // Read and store a sample.
         val = adc_read();
         sampleBuffer[b] = val;
 
+        // Find the current horizontal position of the progress bar.
         x = (b * (DISPLAY_WIDTH - 12)) / SAMPLE_LENGTH;
         if (x > oldX) {
+            // If the bar has moved since last time, draw the difference.
+            lcd_fillRect(4 + oldX, 126, 4 + x, 128, RED);
             oldX = x;
-            lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
         }
 
+        // Listen out for the centre button being pressed to stop recording.
         if (input_getButtonPress() == BUTTON_CENTER) {
             recordedSamples = b;
             break;
         }
-
     }
+
+    // Ensure the entire progress bar is filled.
     lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, RED);
-    lcd_fillRect(4, 4, DISPLAY_WIDTH - 8, 126, BLACK);
 }
 
+// Play back the recording until either the playback is complete or a button
+// is pressed by the user.
 void play(int volume)
 {
     int b, val, x, oldX; volatile int i;
 
+    // Clear the progress bar.
     lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, WHITE);
+    
     oldX = 0;
-
     for (b = 0; b < recordedSamples; ++b) {
+        // Retrieve a sample and adjust it with the given volume, then send it
+        // to the DAC.
         val = (sampleBuffer[b] * volume) / 256;
         DACR = cpyBits(0, 6, 10, val);
 
+        // Find the current horizontal position of the progress bar.
         x = (b * (DISPLAY_WIDTH - 12)) / recordedSamples;
         if (x > oldX) {
+            // If the bar has moved since last time, draw the difference.
             oldX = x;
             lcd_fillRect(4 + x - 1, 126, 4 + x, 128, RED);
         }
+
+        // Listen out for a button being pressed to stop playback.
         if (input_getButtonPress() != BUTTON_NONE) break;
 
         for (i = 0; i < PLAYBACK_LOOP_ITERS; ++ i);
     }
 
+    // Ensure the entire progress bar is filled.
     lcd_fillRect(4, 126, DISPLAY_WIDTH - 8, 128, RED);
 }
 
+// Draw a graph of the amplitude for the recorded sample. Finds the minimum and
+// maximum samples, average sample, and then uses the magnitude of the
+// difference between each sample and the average to generate the graph which
+// is appropriately scaled so that the maximum and minimum values fill the
+// graph area.
 void drawBuffer(int x, int y, int w, int h)
 {
     short val, prev, rangeMin, rangeMax, valMin, valMax;
     int i, b, start, end;
     long int avg;
 
+    // Default values for the range which will naturally be replaced by the
+    // first sample.
     rangeMin = 0x3ff;
     rangeMax = 0x000;
     avg = 0;
 
+    // Find the true values for the range, and find the sum from which an
+    // average may be calculated.
     for (b = 0; b < recordedSamples; ++b) {
         val = sampleBuffer[b];
         avg += val;
@@ -481,17 +515,23 @@ void drawBuffer(int x, int y, int w, int h)
         if (val < rangeMin) rangeMin = val;
     }
 
+    // Find the true mean as the sum divided by the number of samples.
     avg /= recordedSamples;
 
+    // Find the largest difference from the average.
     rangeMax = max(rangeMax - avg, avg - rangeMin);
 
     prev = 0;
     for (i = 0; i < w; ++i) {
+        // Each column of pixels will represent many samples, so find the range
+        // of samples to.. sample from.
         start = (i * recordedSamples) / w;
         end = ((i + 1) * recordedSamples) / w;
 
+        // If the size of the sample sample is zero we can skip this column.
         if (start == end) continue;
 
+        // Find the largest and smallest samples from the sample sample.
         valMin = 0x3ff;
         valMax = 0x000;
         for (b = start; b < end; ++b) {
@@ -500,65 +540,85 @@ void drawBuffer(int x, int y, int w, int h)
             if (val > valMax) valMax = val;
         }
 
+        // Find the largest difference from the mean.
         val = max(abs(valMax - avg), abs(avg - valMin));
 
+        // Draw a line from the previous column of the graph to this column's
+        // value, scaled to fit the graph height.
         lcd_line(x + i - 1, y + h - (prev * h) / rangeMax,
             x + i, y + h - (val * h) / rangeMax, WHITE);
 
+        // Remember the last value drawn so a line can be drawn from it.
         prev = val;
     }
 }
 
+// Draw the volume meter in the specified location with the given size.
 void drawVolume(int volume, int x, int y, int w, int h)
 {
     lcd_fillRect(x, y, x + w, y + h - (volume * h) / 9, WHITE);
     lcd_fillRect(x, y + h - (volume * h) / 9, x + w, y + h, RED);
 }
 
+// Entry point, containing initialization and main update loop.
 int main(void)
 {
     int volume;
 
+    // Array of volume settings, which are approximately exponential.
     const int volumes[10] = {
         0, 16, 22, 31, 44, 61, 86, 120, 169, 256
     };
 
+    // Initialize the display, DAC and ADC.
     lcd_init();
     dac_init();
     adc_init();
 
-    lcd_putBigStringCentered(0, 160, DISPLAY_WIDTH, 32,
-        "Center : Record  ");
-    lcd_putBigStringCentered(0, 192, DISPLAY_WIDTH, 32,
-        " Right : Play    ");
-    lcd_putBigStringCentered(0, 224, DISPLAY_WIDTH, 32,
-        "    Up : +Volume ");
-    lcd_putBigStringCentered(0, 256, DISPLAY_WIDTH, 32,
-        "  Down : -Volume ");
+    // Draw the on-screen instructions.
+    lcd_putBigStringCentered(0, 160, DISPLAY_WIDTH, 32, "Center : Record  ");
+    lcd_putBigStringCentered(0, 192, DISPLAY_WIDTH, 32, " Right : Play    ");
+    lcd_putBigStringCentered(0, 224, DISPLAY_WIDTH, 32, "    Up : +Volume ");
+    lcd_putBigStringCentered(0, 256, DISPLAY_WIDTH, 32, "  Down : -Volume ");
 
+    // Ensure the sample count is zero.
     clear();
 
+    // Set the initial volume and draw the volume display.
     volume = 8;
     drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
 
+    // Main input loop.
     for(;;) {
+
+        // Wait for a button press and then act according to its value.
         switch (input_waitForButtonPress()) {
+
+            // Centre button starts recording.
             case BUTTON_CENTER:
                 record();
                 drawBuffer(6, 4, DISPLAY_WIDTH - 14, 120);
                 break;
+
+            // Left button clears the recording.
             case BUTTON_LEFT:
                 clear();
                 break;
+
+            // Right button initiates playback.
             case BUTTON_RIGHT:
                 if (recordedSamples > 0) {
                     play(volumes[volume]);
                 }
                 break;
+
+            // Up button increases volume.
             case BUTTON_UP:
                 volume = min(9, volume + 1);
                 drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
                 break;
+
+            // Down button decreases volume.
             case BUTTON_DOWN:
                 volume = max(0, volume - 1);
                 drawVolume(volume, DISPLAY_WIDTH - 5, 4, 2, 120);
