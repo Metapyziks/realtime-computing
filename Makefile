@@ -50,7 +50,6 @@ $(EXERCISE).o: $(EXERCISE).c Makefile
 	cs-rm -f $(EXERCISE).o $(EXERCISE).elf $(EXERCISE).hex $(EXERCISE).lst
 ifdef EXTMEM
 	arm-none-eabi-gcc -c $(CFLAGS) -D EXTMEM $(EXERCISE).c
-	arm-none-eabi-gcc -c -S $(CFLAGS) -D EXTMEM $(EXERCISE).c
 else
 	arm-none-eabi-gcc -c $(CFLAGS) $(EXERCISE).c
 endif
