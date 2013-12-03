@@ -2,7 +2,7 @@
 # Change the name of the exercise below as required.
 # Your C file should have the same name (without .c at the end)
 # NOTE: NO SPACES ALLOWED IN EXERCISE NAME
-EXERCISE = ex3
+EXERCISE = ex5
 
 # If using 32Mb external memory, define EXTMEM
 # If need 32 bit LED port,comment out this line.
