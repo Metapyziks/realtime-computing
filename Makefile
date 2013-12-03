@@ -46,7 +46,7 @@ $(EXERCISE).hex: $(EXERCISE).elf
 $(EXERCISE).elf: $(EXERCISE).o
 	arm-none-eabi-gcc $(LDFLAGS) $(STARTFILES) $(EXERCISE).o -lc -lm $(LCDLIB) -o $(EXERCISE).elf
 	
-$(EXERCISE).o: $(EXERCISE).c utils.h input.h lcd.h motor.h Makefile
+$(EXERCISE).o: $(EXERCISE).c Makefile
 	cs-rm -f $(EXERCISE).o $(EXERCISE).elf $(EXERCISE).hex $(EXERCISE).lst
 ifdef EXTMEM
 	arm-none-eabi-gcc -c $(CFLAGS) -D EXTMEM $(EXERCISE).c
