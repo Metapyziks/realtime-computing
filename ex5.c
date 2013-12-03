@@ -108,7 +108,8 @@
 // Type Definitions //
 //////////////////////
 
-// I'm homesick for sane languages.
+// Used to assist readability of variables that are expected to hold a truth
+// value.
 typedef int bool;
 
 // Structure representing a position in 2D space.
@@ -626,5 +627,7 @@ int main(void)
         }
     }
 
+    // Control flow will never reach here, so the actual return value is
+    // irrelevant.
     return 0;
 }
