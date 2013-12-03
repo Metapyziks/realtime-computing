@@ -19,7 +19,7 @@ LCDLIB = $(ROOTPATH)/lcd/liblcd.a
 # We tell it the processor, to optimise for size and where to look for include files
 # (and lots of helpful warnings)
 INCLUDES = -I$(ROOTPATH)/include -I$(ROOTPATH)/lcd
-CFLAGS   = -mcpu=arm7tdmi -Os -Wall -Wcast-align -Wcast-qual -Wimplicit \
+CFLAGS   = -Os -mcpu=arm7tdmi -Wall -Wcast-align -Wcast-qual -Wimplicit \
 	   -Wmissing-declarations -Wmissing-prototypes -Wnested-externs \
 	   -Wpointer-arith -Wredundant-decls -Wshadow \
 	   -Wstrict-prototypes $(INCLUDES)
@@ -50,6 +50,7 @@ $(EXERCISE).o: $(EXERCISE).c Makefile
 	cs-rm -f $(EXERCISE).o $(EXERCISE).elf $(EXERCISE).hex $(EXERCISE).lst
 ifdef EXTMEM
 	arm-none-eabi-gcc -c $(CFLAGS) -D EXTMEM $(EXERCISE).c
+	arm-none-eabi-gcc -c -S $(CFLAGS) -D EXTMEM $(EXERCISE).c
 else
 	arm-none-eabi-gcc -c $(CFLAGS) $(EXERCISE).c
 endif
