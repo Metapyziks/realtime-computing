@@ -166,7 +166,7 @@ void drawVolume(int volume, int x, int y, int w, int h);
 //////////////////////
 
 // The sample buffer must be global otherwise it exceeds the allowed stack
-// size for the function it is declared in.
+// frame size for the function it is declared in.
 short sampleBuffer[SAMPLE_LENGTH];
 
 // The number of samples recorded.
